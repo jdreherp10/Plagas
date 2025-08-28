@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Proforma Ecuafumi</title>
+    <style>
+        @media print {
+            .no-print { display: none; }
+            body { margin: 0; }
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .print-button {
+            background: #4ab646;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        /* Resto de estilos del PDF */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #2a59a8;
+            padding-bottom: 15px;
+        }
+        
+        .logo {
+            height: 80px;
+        }
+        
+        .proforma-box {
+            border: 2px solid #2a59a8;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        /* Más estilos... */
+    </style>
+</head>
+<body>
+    <button class="print-button no-print" onclick="window.print()">
+        📥 Descargar PDF
+    </button>
+    
+    <div class="header">
+        <img src="https://raw.githubusercontent.com/jdreherp10/Plagas/main/Logo-web-ECUAFUMI.png" class="logo">
+        <div class="proforma-box">
+            <h2 style="color: #4ab646;">PROFORMA N.º <span id="numero">2024-001</span></h2>
+            <p>Fecha: <span id="fecha">27/08/2025</span></p>
+        </div>
+    </div>
+    
+    <!-- Resto del HTML de la proforma -->
+    
+    <script>
+        // Leer parámetros de URL
+        const params = new URLSearchParams(window.location.search);
+        
+        // Actualizar valores dinámicos
+        document.getElementById('numero').textContent = params.get('numero') || '2024-001';
+        document.getElementById('fecha').textContent = params.get('fecha') || '27/08/2025';
+        // Más campos...
+    </script>
+</body>
+</html>
