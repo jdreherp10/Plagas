@@ -62,15 +62,62 @@
     </div>
     
     <!-- Resto del HTML de la proforma -->
-    
     <script>
-        // Leer parámetros de URL
+    // Función mejorada para manejar múltiples plagas
+    function getUrlParams() {
         const params = new URLSearchParams(window.location.search);
         
-        // Actualizar valores dinámicos
-        document.getElementById('numero').textContent = params.get('numero') || '2024-001';
-        document.getElementById('fecha').textContent = params.get('fecha') || '27/08/2025';
-        // Más campos...
-    </script>
+        // Intentar parsear plagas desde JSON
+        let plagas = [];
+        try {
+            const plagasParam = params.get('plagas');
+            if (plagasParam) {
+                plagas = JSON.parse(decodeURIComponent(plagasParam));
+            }
+        } catch (e) {
+            console.log('Error parseando plagas, usando valores default');
+            plagas = [
+                {nombre: "Servicio", lugares: "General", metodos: "Estándar", precio: 100}
+            ];
+        }
+        
+        return {
+            numero: params.get('numero') || '2024-001',
+            fecha: params.get('fecha') || new Date().toLocaleDateString('es-EC'),
+            clienteNombre: params.get('cliente_nombre') || 'Cliente Demo',
+            clienteRuc: params.get('cliente_ruc') || '9999999999',
+            clienteAtencion: params.get('cliente_atencion') || 'Gerente General',
+            clienteDireccion: params.get('cliente_direccion') || 'Dirección del cliente',
+            clienteTelefono: params.get('cliente_telefono') || '099-999-9999',
+            clienteEmail: params.get('cliente_email') || 'cliente@email.com',
+            plagas: plagas,
+            proceso: params.get('proceso') || 'Proceso estándar de fumigación',
+            observaciones: params.get('observaciones') || 'Sin observaciones adicionales',
+            firmaNombre: params.get('firma_nombre') || 'Ejecutivo Comercial',
+            firmaCargo: params.get('firma_cargo') || 'Ejecutivo',
+            formaPago: params.get('forma_pago') || 'Contado'
+        };
+    }
+    
+    // Agregar campo de forma de pago al HTML
+    function fillTemplate() {
+        const data = getUrlParams();
+        
+        // ... resto del código igual ...
+        
+        // Agregar forma de pago después del total
+        if (data.formaPago) {
+            const totalsDiv = document.querySelector('.totals');
+            totalsDiv.innerHTML += `
+                <div class="total-row" style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd;">
+                    <span><strong>Forma de Pago:</strong></span>
+                    <span>${data.formaPago}</span>
+                </div>
+            `;
+        }
+    }
+    
+    fillTemplate();
+</script>
 </body>
 </html>
