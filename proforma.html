@@ -1,211 +1,146 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Proforma Ecuafumi</title>
-    <style>
-        @media print {
-            .no-print { display: none; }
-            body { margin: 0; }
-        }
-        
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 210mm;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .print-button {
-            background: #4ab646;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-bottom: 20px;
-        }
-        
-        /* Resto de estilos del PDF */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #2a59a8;
-            padding-bottom: 15px;
-        }
-        
-        .logo {
-            height: 80px;
-        }
-        
-        .proforma-box {
-            border: 2px solid #2a59a8;
-            padding: 15px;
-            border-radius: 5px;
-        }
-        
-        /* Más estilos... */
-    </style>
-</head>
-<body>
-    <button class="print-button no-print" onclick="window.print()">
-        📥 Descargar PDF
-    </button>
-    
-    <div class="header">
-        <img src="https://raw.githubusercontent.com/jdreherp10/Plagas/main/Logo-web-ECUAFUMI.png" class="logo">
-        <div class="proforma-box">
-            <h2 style="color: #4ab646;">PROFORMA N.º <span id="numero">2024-001</span></h2>
-            <p>Fecha: <span id="fecha">27/08/2025</span></p>
-        </div>
-    </div>
-    
-    <!-- Resto del HTML de la proforma -->
-    <script>
+<script>
 function getUrlParams() {
     const params = new URLSearchParams(window.location.search);
     
-    // Función auxiliar para limpiar y dividir listas de AppSheet
-    function parseAppSheetList(param) {
-        if (!param || param === '' || param === 'undefined') return [];
-        // AppSheet usa " , " como separador
-        return param.split(' , ').filter(item => item && item !== '');
+    // Función para decodificar parámetros
+    function getParam(name) {
+        const value = params.get(name);
+        return value ? decodeURIComponent(value) : '';
     }
     
-    // Obtener y parsear las listas
-    const nombres = parseAppSheetList(params.get('plagas_nombres'));
-    const lugares = parseAppSheetList(params.get('plagas_lugares'));
-    const metodos = parseAppSheetList(params.get('plagas_metodos'));
-    const precios = parseAppSheetList(params.get('plagas_precios'));
+    // Obtener los datos raw
+    const nombresRaw = getParam('plagas_nombres');
+    const lugaresRaw = getParam('plagas_lugares');
+    const metodosRaw = getParam('plagas_metodos');
+    const preciosRaw = getParam('plagas_precios');
     
-    // Si no hay nombres pero sí lugares, crear una entrada genérica
+    // Dividir por punto y coma para obtener grupos
+    const gruposNombres = nombresRaw ? nombresRaw.split(';').filter(g => g.trim()) : [];
+    const gruposLugares = lugaresRaw ? lugaresRaw.split(';') : [];
+    const gruposMetodos = metodosRaw ? metodosRaw.split(';') : [];
+    const gruposPrecios = preciosRaw ? preciosRaw.split(';') : [];
+    
+    // Construir array de plagas (cada grupo es un ítem)
     const plagas = [];
     
-    if (nombres.length === 0 && lugares.length > 0) {
-        // Caso especial: no hay nombres de plagas pero sí lugares
+    for (let i = 0; i < gruposNombres.length; i++) {
         plagas.push({
-            nombre: "Control de Plagas General",
-            lugares: lugares.join(', '),
-            metodos: metodos.join(', ') || "Tratamiento estándar",
-            precio: parseFloat(precios[0]) || 200
+            nombre: gruposNombres[i].trim(),
+            lugares: (gruposLugares[i] || 'Todas las áreas').trim(),
+            metodos: (gruposMetodos[i] || 'Tratamiento estándar').trim(),
+            precio: parseFloat(gruposPrecios[i]) || 100
         });
-    } else if (nombres.length > 0) {
-        // Caso normal: hay nombres de plagas
-        for (let i = 0; i < nombres.length; i++) {
-            plagas.push({
-                nombre: nombres[i],
-                lugares: lugares[i] || 'Por definir',
-                metodos: metodos[i] || 'Tratamiento estándar',
-                precio: parseFloat(precios[i]) || 0
-            });
-        }
-    } else {
-        // Caso fallback: no hay datos de plagas
-        // Intentar crear una entrada única con todos los lugares
-        const todosLugares = params.get('plagas_lugares');
-        const todosPrecio = params.get('plagas_precios');
-        
-        if (todosLugares && todosLugares !== '') {
-            plagas.push({
-                nombre: "Servicio de Fumigación",
-                lugares: decodeURIComponent(todosLugares).replace(/ , /g, ', '),
-                metodos: "Fumigación y Desratización",
-                precio: parseFloat(todosPrecio) || 200
-            });
-        }
     }
     
-    // Si aún no hay plagas, agregar una por defecto
+    // Si no hay plagas, agregar una por defecto
     if (plagas.length === 0) {
         plagas.push({
-            nombre: "Servicio Estándar",
+            nombre: "Servicio de Control de Plagas",
             lugares: "Todas las áreas",
             metodos: "Según evaluación",
-            precio: 100
+            precio: 200
         });
     }
     
     return {
-        numero: params.get('numero') || '2024-001',
-        fecha: params.get('fecha') || new Date().toLocaleDateString('es-EC'),
-        clienteNombre: decodeURIComponent(params.get('cliente_nombre') || 'Cliente'),
-        clienteRuc: params.get('cliente_ruc') || '',
-        clienteAtencion: decodeURIComponent(params.get('cliente_atencion') || ''),
-        clienteDireccion: decodeURIComponent(params.get('cliente_direccion') || 'No especificada'),
-        clienteTelefono: params.get('cliente_telefono') || 'No especificado',
-        clienteEmail: params.get('cliente_email') || 'No especificado',
-        proceso: decodeURIComponent(params.get('proceso') || 'Proceso estándar'),
-        observaciones: decodeURIComponent(params.get('observaciones') || 'Sin observaciones adicionales'),
-        firmaNombre: decodeURIComponent(params.get('firma_nombre') || 'Representante'),
-        firmaCargo: params.get('firma_cargo') || 'Ejecutivo Comercial',
-        formaPago: decodeURIComponent(params.get('forma_pago') || 'Contado'),
+        numero: getParam('numero') || '2024-001',
+        fecha: getParam('fecha') || new Date().toLocaleDateString('es-EC'),
+        clienteNombre: getParam('cliente_nombre') || 'Cliente',
+        clienteRuc: getParam('cliente_ruc') || '',
+        clienteAtencion: getParam('cliente_atencion') || '',
+        clienteDireccion: getParam('cliente_direccion') || 'No especificada',
+        clienteTelefono: getParam('cliente_telefono') || 'No especificado',
+        clienteEmail: getParam('cliente_email') || 'No especificado',
+        proceso: getParam('proceso') || 'Proceso estándar',
+        observaciones: getParam('observaciones') || 'Sin observaciones adicionales',
+        firmaNombre: getParam('firma_nombre') || 'Representante',
+        firmaCargo: 'Ejecutivo Comercial',
+        formaPago: getParam('forma_pago') || 'Contado',
         plagas: plagas
     };
 }
 
 function fillTemplate() {
-    const data = getUrlParams();
-    
-    // Debug - ver qué datos llegan
-    console.log('Datos recibidos:', data);
-    
-    // Llenar campos simples
-    document.getElementById('numero').textContent = data.numero;
-    document.getElementById('fecha').textContent = data.fecha;
-    document.getElementById('cliente-nombre').textContent = data.clienteNombre;
-    document.getElementById('cliente-ruc').textContent = data.clienteRuc;
-    document.getElementById('cliente-atencion').textContent = data.clienteAtencion;
-    document.getElementById('cliente-direccion').textContent = data.clienteDireccion;
-    document.getElementById('cliente-telefono').textContent = data.clienteTelefono;
-    document.getElementById('cliente-email').textContent = data.clienteEmail || data.clienteTelefono;
-    document.getElementById('proceso').textContent = data.proceso;
-    document.getElementById('observaciones').textContent = data.observaciones;
-    document.getElementById('firma-nombre').textContent = data.firmaNombre;
-    document.getElementById('firma-cargo').textContent = data.firmaCargo;
-    
-    // Llenar tabla de plagas
-    const tbody = document.getElementById('tabla-plagas');
-    tbody.innerHTML = ''; // Limpiar tabla
-    let subtotal = 0;
-    
-    data.plagas.forEach(plaga => {
-        const row = tbody.insertRow();
-        row.innerHTML = `
-            <td><strong>${plaga.nombre}</strong></td>
-            <td>${plaga.lugares}</td>
-            <td>${plaga.metodos}</td>
-            <td class="text-right">$${plaga.precio.toFixed(2)}</td>
-        `;
-        subtotal += plaga.precio;
-    });
-    
-    // Calcular totales
-    const iva = subtotal * 0.15;
-    const total = subtotal + iva;
-    
-    document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
-    document.getElementById('iva').textContent = `$${iva.toFixed(2)}`;
-    document.getElementById('total').textContent = `$${total.toFixed(2)}`;
-    
-    // Agregar forma de pago si existe
-    if (data.formaPago) {
-        const totalsDiv = document.querySelector('.totals');
-        const formaPagoDiv = document.createElement('div');
-        formaPagoDiv.className = 'total-row';
-        formaPagoDiv.style.marginTop = '15px';
-        formaPagoDiv.style.paddingTop = '10px';
-        formaPagoDiv.style.borderTop = '1px solid #ddd';
-        formaPagoDiv.innerHTML = `
-            <span><strong>Forma de Pago:</strong></span>
-            <span>${data.formaPago}</span>
-        `;
-        totalsDiv.appendChild(formaPagoDiv);
+    try {
+        const data = getUrlParams();
+        console.log('Datos procesados:', data);
+        
+        // Función helper para asignar texto de forma segura
+        const setTextContent = (id, value) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value || '-';
+            }
+        };
+        
+        // Llenar información básica
+        setTextContent('numero', data.numero);
+        setTextContent('fecha', data.fecha);
+        setTextContent('cliente-nombre', data.clienteNombre);
+        setTextContent('cliente-ruc', data.clienteRuc);
+        setTextContent('cliente-atencion', data.clienteAtencion);
+        setTextContent('cliente-direccion', data.clienteDireccion);
+        setTextContent('cliente-telefono', data.clienteTelefono);
+        setTextContent('cliente-email', data.clienteEmail);
+        setTextContent('proceso', data.proceso);
+        setTextContent('observaciones', data.observaciones);
+        setTextContent('firma-nombre', data.firmaNombre);
+        setTextContent('firma-cargo', data.firmaCargo);
+        
+        // Llenar tabla de plagas
+        const tbody = document.getElementById('tabla-plagas');
+        if (tbody) {
+            tbody.innerHTML = '';
+            let subtotal = 0;
+            
+            data.plagas.forEach((plaga, index) => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td><strong>${plaga.nombre}</strong></td>
+                    <td>${plaga.lugares}</td>
+                    <td>${plaga.metodos}</td>
+                    <td class="text-right" style="font-family: monospace;">$${plaga.precio.toFixed(2)}</td>
+                `;
+                subtotal += plaga.precio;
+            });
+            
+            // Calcular y mostrar totales
+            const iva = subtotal * 0.15;
+            const total = subtotal + iva;
+            
+            setTextContent('subtotal', `$${subtotal.toFixed(2)}`);
+            setTextContent('iva', `$${iva.toFixed(2)}`);
+            setTextContent('total', `$${total.toFixed(2)}`);
+            
+            // Agregar forma de pago
+            const totalsDiv = document.querySelector('.totals');
+            if (totalsDiv && data.formaPago) {
+                const existingFormaPago = document.getElementById('forma-pago-row');
+                if (!existingFormaPago) {
+                    const formaPagoDiv = document.createElement('div');
+                    formaPagoDiv.id = 'forma-pago-row';
+                    formaPagoDiv.className = 'total-row';
+                    formaPagoDiv.style.marginTop = '15px';
+                    formaPagoDiv.style.paddingTop = '10px';
+                    formaPagoDiv.style.borderTop = '1px solid #ddd';
+                    formaPagoDiv.innerHTML = `
+                        <span><strong>Forma de Pago:</strong></span>
+                        <span>${data.formaPago}</span>
+                    `;
+                    totalsDiv.appendChild(formaPagoDiv);
+                }
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error llenando plantilla:', error);
     }
 }
 
-// Ejecutar al cargar
-window.addEventListener('DOMContentLoaded', fillTemplate);
+// Ejecutar cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fillTemplate);
+} else {
+    fillTemplate();
+}
 </script>
-</body>
-</html>
