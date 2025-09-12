@@ -1,146 +1,465 @@
-<script>
-function getUrlParams() {
-    const params = new URLSearchParams(window.location.search);
-    
-    // Función para decodificar parámetros
-    function getParam(name) {
-        const value = params.get(name);
-        return value ? decodeURIComponent(value) : '';
-    }
-    
-    // Obtener los datos raw
-    const nombresRaw = getParam('plagas_nombres');
-    const lugaresRaw = getParam('plagas_lugares');
-    const metodosRaw = getParam('plagas_metodos');
-    const preciosRaw = getParam('plagas_precios');
-    
-    // Dividir por punto y coma para obtener grupos
-    const gruposNombres = nombresRaw ? nombresRaw.split(';').filter(g => g.trim()) : [];
-    const gruposLugares = lugaresRaw ? lugaresRaw.split(';') : [];
-    const gruposMetodos = metodosRaw ? metodosRaw.split(';') : [];
-    const gruposPrecios = preciosRaw ? preciosRaw.split(';') : [];
-    
-    // Construir array de plagas (cada grupo es un ítem)
-    const plagas = [];
-    
-    for (let i = 0; i < gruposNombres.length; i++) {
-        plagas.push({
-            nombre: gruposNombres[i].trim(),
-            lugares: (gruposLugares[i] || 'Todas las áreas').trim(),
-            metodos: (gruposMetodos[i] || 'Tratamiento estándar').trim(),
-            precio: parseFloat(gruposPrecios[i]) || 100
-        });
-    }
-    
-    // Si no hay plagas, agregar una por defecto
-    if (plagas.length === 0) {
-        plagas.push({
-            nombre: "Servicio de Control de Plagas",
-            lugares: "Todas las áreas",
-            metodos: "Según evaluación",
-            precio: 200
-        });
-    }
-    
-    return {
-        numero: getParam('numero') || '2024-001',
-        fecha: getParam('fecha') || new Date().toLocaleDateString('es-EC'),
-        clienteNombre: getParam('cliente_nombre') || 'Cliente',
-        clienteRuc: getParam('cliente_ruc') || '',
-        clienteAtencion: getParam('cliente_atencion') || '',
-        clienteDireccion: getParam('cliente_direccion') || 'No especificada',
-        clienteTelefono: getParam('cliente_telefono') || 'No especificado',
-        clienteEmail: getParam('cliente_email') || 'No especificado',
-        proceso: getParam('proceso') || 'Proceso estándar',
-        observaciones: getParam('observaciones') || 'Sin observaciones adicionales',
-        firmaNombre: getParam('firma_nombre') || 'Representante',
-        firmaCargo: 'Ejecutivo Comercial',
-        formaPago: getParam('forma_pago') || 'Contado',
-        plagas: plagas
-    };
-}
-
-function fillTemplate() {
-    try {
-        const data = getUrlParams();
-        console.log('Datos procesados:', data);
-        
-        // Función helper para asignar texto de forma segura
-        const setTextContent = (id, value) => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.textContent = value || '-';
-            }
-        };
-        
-        // Llenar información básica
-        setTextContent('numero', data.numero);
-        setTextContent('fecha', data.fecha);
-        setTextContent('cliente-nombre', data.clienteNombre);
-        setTextContent('cliente-ruc', data.clienteRuc);
-        setTextContent('cliente-atencion', data.clienteAtencion);
-        setTextContent('cliente-direccion', data.clienteDireccion);
-        setTextContent('cliente-telefono', data.clienteTelefono);
-        setTextContent('cliente-email', data.clienteEmail);
-        setTextContent('proceso', data.proceso);
-        setTextContent('observaciones', data.observaciones);
-        setTextContent('firma-nombre', data.firmaNombre);
-        setTextContent('firma-cargo', data.firmaCargo);
-        
-        // Llenar tabla de plagas
-        const tbody = document.getElementById('tabla-plagas');
-        if (tbody) {
-            tbody.innerHTML = '';
-            let subtotal = 0;
-            
-            data.plagas.forEach((plaga, index) => {
-                const row = tbody.insertRow();
-                row.innerHTML = `
-                    <td><strong>${plaga.nombre}</strong></td>
-                    <td>${plaga.lugares}</td>
-                    <td>${plaga.metodos}</td>
-                    <td class="text-right" style="font-family: monospace;">$${plaga.precio.toFixed(2)}</td>
-                `;
-                subtotal += plaga.precio;
-            });
-            
-            // Calcular y mostrar totales
-            const iva = subtotal * 0.15;
-            const total = subtotal + iva;
-            
-            setTextContent('subtotal', `$${subtotal.toFixed(2)}`);
-            setTextContent('iva', `$${iva.toFixed(2)}`);
-            setTextContent('total', `$${total.toFixed(2)}`);
-            
-            // Agregar forma de pago
-            const totalsDiv = document.querySelector('.totals');
-            if (totalsDiv && data.formaPago) {
-                const existingFormaPago = document.getElementById('forma-pago-row');
-                if (!existingFormaPago) {
-                    const formaPagoDiv = document.createElement('div');
-                    formaPagoDiv.id = 'forma-pago-row';
-                    formaPagoDiv.className = 'total-row';
-                    formaPagoDiv.style.marginTop = '15px';
-                    formaPagoDiv.style.paddingTop = '10px';
-                    formaPagoDiv.style.borderTop = '1px solid #ddd';
-                    formaPagoDiv.innerHTML = `
-                        <span><strong>Forma de Pago:</strong></span>
-                        <span>${data.formaPago}</span>
-                    `;
-                    totalsDiv.appendChild(formaPagoDiv);
-                }
-            }
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proforma ECUAFUMI</title>
+    <style>
+        @media print {
+            .no-print { display: none; }
+            body { margin: 0; padding: 10mm; }
+            .page-break { page-break-after: always; }
         }
         
-    } catch (error) {
-        console.error('Error llenando plantilla:', error);
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            color: #333;
+        }
+        
+        .controls {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .print-button {
+            background: #4ab646;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .print-button:hover {
+            background: #3da539;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #2a59a8;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .logo { 
+            height: 80px;
+            object-fit: contain;
+        }
+        
+        .proforma-box {
+            border: 2px solid #2a59a8;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f9f9f9;
+            text-align: right;
+        }
+        
+        .proforma-number {
+            color: #4ab646;
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0 0 10px 0;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .info-box {
+            padding: 15px;
+            border-radius: 8px;
+            background: #f5f5f5;
+        }
+        
+        .info-box.cliente {
+            background: #e8f4f8;
+        }
+        
+        .info-box h3 {
+            color: #2a59a8;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .info-box p {
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+        
+        .section-title {
+            color: #4ab646;
+            font-size: 20px;
+            font-weight: bold;
+            margin: 30px 0 15px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th {
+            background: #f0f0f0;
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #ddd;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        td {
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        
+        tr:nth-child(even) {
+            background: #fafafa;
+        }
+        
+        .text-right { 
+            text-align: right; 
+        }
+        
+        .totals {
+            margin-left: auto;
+            width: 300px;
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .total-final {
+            border-top: 2px solid #333;
+            padding-top: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #4ab646;
+        }
+        
+        .process-box {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .process {
+            background: #e8f4f8;
+        }
+        
+        .observations {
+            background: #e8f8e8;
+        }
+        
+        .process-box h3 {
+            color: #2a59a8;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        
+        .signature-section {
+            margin-top: 60px;
+            width: 250px;
+        }
+        
+        .signature-line {
+            border-top: 2px solid #666;
+            padding-top: 10px;
+        }
+        
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+        
+        .footer-text {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .footer-logo {
+            height: 40px;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+    <!-- Controles (no se imprimen) -->
+    <div class="controls no-print">
+        <button class="print-button" onclick="window.print()">
+            📥 Descargar como PDF
+        </button>
+        <span style="margin-left: 20px; color: #666;">
+            Proforma generada automáticamente
+        </span>
+    </div>
+    
+    <!-- Encabezado -->
+    <div class="header">
+        <img src="https://raw.githubusercontent.com/jdreherp10/Plagas/main/Logo-web-ECUAFUMI.png" 
+             class="logo" alt="ECUAFUMI">
+        <div class="proforma-box">
+            <h2 class="proforma-number">PROFORMA N.º <span id="numero">---</span></h2>
+            <p><strong>Fecha:</strong> <span id="fecha">---</span></p>
+        </div>
+    </div>
+    
+    <!-- Información empresa y cliente -->
+    <div class="info-grid">
+        <div class="info-box">
+            <h3>DATOS DE LA EMPRESA</h3>
+            <p><strong>ECUAFUMI S.A.</strong></p>
+            <p>RUC: 0991234567001</p>
+            <p>Av. Francisco de Orellana 234</p>
+            <p>Guayaquil, Ecuador</p>
+            <p>📞 +593 4 234 5678</p>
+            <p>✉ info@ecuafumi.com</p>
+            <p>🌐 www.ecuafumi.com</p>
+        </div>
+        
+        <div class="info-box cliente">
+            <h3>DATOS DEL CLIENTE</h3>
+            <p><strong id="cliente-nombre">---</strong></p>
+            <p>RUC/CI: <span id="cliente-ruc">---</span></p>
+            <p><strong>Atención a: <span id="cliente-atencion">---</span></strong></p>
+            <p id="cliente-direccion">---</p>
+            <p>📞 <span id="cliente-telefono">---</span></p>
+            <p>✉ <span id="cliente-email">---</span></p>
+        </div>
+    </div>
+    
+    <!-- Tabla de plagas -->
+    <h2 class="section-title">PLAGAS A TRATAR</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Plaga</th>
+                <th>Lugares</th>
+                <th>Métodos</th>
+                <th class="text-right" style="width: 120px;">Precio (USD)</th>
+            </tr>
+        </thead>
+        <tbody id="tabla-plagas">
+            <!-- Se llena dinámicamente -->
+        </tbody>
+    </table>
+    
+    <!-- Totales -->
+    <div class="totals">
+        <div class="total-row">
+            <span>Subtotal:</span>
+            <span id="subtotal">$0.00</span>
+        </div>
+        <div class="total-row">
+            <span>IVA (15%):</span>
+            <span id="iva">$0.00</span>
+        </div>
+        <div class="total-row total-final">
+            <span>TOTAL:</span>
+            <span id="total">$0.00</span>
+        </div>
+    </div>
+    
+    <!-- Proceso y observaciones -->
+    <div style="margin-top: 40px;">
+        <h2 class="section-title">PROCESO Y OBSERVACIONES</h2>
+        <div class="process-box process">
+            <h3>Proceso a seguir:</h3>
+            <p id="proceso">---</p>
+        </div>
+        <div class="process-box observations">
+            <h3>Observaciones:</h3>
+            <p id="observaciones" style="white-space: pre-line;">---</p>
+        </div>
+    </div>
+    
+    <!-- Firma -->
+    <div class="signature-section">
+        <div class="signature-line">
+            <p><strong id="firma-nombre">---</strong></p>
+            <p id="firma-cargo">---</p>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+        <div class="footer-text">
+            <p>Documento válido sin firma • RUC: 0991234567001</p>
+            <p>Página 1 de 1</p>
+        </div>
+        <img src="https://raw.githubusercontent.com/jdreherp10/Plagas/main/NPMA%20LOGO.png" 
+             class="footer-logo" alt="NPMA">
+    </div>
+    
+    <script>
+    function getUrlParams() {
+        const params = new URLSearchParams(window.location.search);
+        
+        // Función para decodificar parámetros
+        function getParam(name) {
+            const value = params.get(name);
+            return value ? decodeURIComponent(value) : '';
+        }
+        
+        // Obtener los datos raw
+        const nombresRaw = getParam('plagas_nombres');
+        const lugaresRaw = getParam('plagas_lugares');
+        const metodosRaw = getParam('plagas_metodos');
+        const preciosRaw = getParam('plagas_precios');
+        
+        // Dividir por punto y coma para obtener grupos
+        const gruposNombres = nombresRaw ? nombresRaw.split(';').filter(g => g.trim()) : [];
+        const gruposLugares = lugaresRaw ? lugaresRaw.split(';') : [];
+        const gruposMetodos = metodosRaw ? metodosRaw.split(';') : [];
+        const gruposPrecios = preciosRaw ? preciosRaw.split(';') : [];
+        
+        // Construir array de plagas (cada grupo es un ítem)
+        const plagas = [];
+        
+        for (let i = 0; i < gruposNombres.length; i++) {
+            plagas.push({
+                nombre: gruposNombres[i].trim(),
+                lugares: (gruposLugares[i] || 'Todas las áreas').trim(),
+                metodos: (gruposMetodos[i] || 'Tratamiento estándar').trim(),
+                precio: parseFloat(gruposPrecios[i]) || 100
+            });
+        }
+        
+        // Si no hay plagas, agregar una por defecto
+        if (plagas.length === 0) {
+            plagas.push({
+                nombre: "Servicio de Control de Plagas",
+                lugares: "Todas las áreas",
+                metodos: "Según evaluación",
+                precio: 200
+            });
+        }
+        
+        return {
+            numero: getParam('numero') || '2024-001',
+            fecha: getParam('fecha') || new Date().toLocaleDateString('es-EC'),
+            clienteNombre: getParam('cliente_nombre') || 'Cliente',
+            clienteRuc: getParam('cliente_ruc') || '',
+            clienteAtencion: getParam('cliente_atencion') || '',
+            clienteDireccion: getParam('cliente_direccion') || 'No especificada',
+            clienteTelefono: getParam('cliente_telefono') || 'No especificado',
+            clienteEmail: getParam('cliente_email') || 'No especificado',
+            proceso: getParam('proceso') || 'Proceso estándar',
+            observaciones: getParam('observaciones') || 'Sin observaciones adicionales',
+            firmaNombre: getParam('firma_nombre') || 'Representante',
+            firmaCargo: 'Ejecutivo Comercial',
+            formaPago: getParam('forma_pago') || 'Contado',
+            plagas: plagas
+        };
     }
-}
-
-// Ejecutar cuando el DOM esté listo
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', fillTemplate);
-} else {
-    fillTemplate();
-}
-</script>
+    
+    function fillTemplate() {
+        try {
+            const data = getUrlParams();
+            console.log('Datos procesados:', data);
+            
+            // Función helper para asignar texto de forma segura
+            const setTextContent = (id, value) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = value || '-';
+                }
+            };
+            
+            // Llenar información básica
+            setTextContent('numero', data.numero);
+            setTextContent('fecha', data.fecha);
+            setTextContent('cliente-nombre', data.clienteNombre);
+            setTextContent('cliente-ruc', data.clienteRuc);
+            setTextContent('cliente-atencion', data.clienteAtencion);
+            setTextContent('cliente-direccion', data.clienteDireccion);
+            setTextContent('cliente-telefono', data.clienteTelefono);
+            setTextContent('cliente-email', data.clienteEmail);
+            setTextContent('proceso', data.proceso);
+            setTextContent('observaciones', data.observaciones);
+            setTextContent('firma-nombre', data.firmaNombre);
+            setTextContent('firma-cargo', data.firmaCargo);
+            
+            // Llenar tabla de plagas
+            const tbody = document.getElementById('tabla-plagas');
+            if (tbody) {
+                tbody.innerHTML = '';
+                let subtotal = 0;
+                
+                data.plagas.forEach((plaga, index) => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td><strong>${plaga.nombre}</strong></td>
+                        <td>${plaga.lugares}</td>
+                        <td>${plaga.metodos}</td>
+                        <td class="text-right" style="font-family: monospace;">$${plaga.precio.toFixed(2)}</td>
+                    `;
+                    subtotal += plaga.precio;
+                });
+                
+                // Calcular y mostrar totales
+                const iva = subtotal * 0.15;
+                const total = subtotal + iva;
+                
+                setTextContent('subtotal', `$${subtotal.toFixed(2)}`);
+                setTextContent('iva', `$${iva.toFixed(2)}`);
+                setTextContent('total', `$${total.toFixed(2)}`);
+                
+                // Agregar forma de pago
+                const totalsDiv = document.querySelector('.totals');
+                if (totalsDiv && data.formaPago) {
+                    const existingFormaPago = document.getElementById('forma-pago-row');
+                    if (!existingFormaPago) {
+                        const formaPagoDiv = document.createElement('div');
+                        formaPagoDiv.id = 'forma-pago-row';
+                        formaPagoDiv.className = 'total-row';
+                        formaPagoDiv.style.marginTop = '15px';
+                        formaPagoDiv.style.paddingTop = '10px';
+                        formaPagoDiv.style.borderTop = '1px solid #ddd';
+                        formaPagoDiv.innerHTML = `
+                            <span><strong>Forma de Pago:</strong></span>
+                            <span>${data.formaPago}</span>
+                        `;
+                        totalsDiv.appendChild(formaPagoDiv);
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error llenando plantilla:', error);
+        }
+    }
+    
+    // Ejecutar cuando el DOM esté listo
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fillTemplate);
+    } else {
+        fillTemplate();
+    }
+    </script>
+</body>
+</html>
