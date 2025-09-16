@@ -314,152 +314,182 @@
         <img src="https://raw.githubusercontent.com/jdreherp10/Plagas/main/NPMA%20LOGO.png" 
              class="footer-logo" alt="NPMA">
     </div>
-    
     <script>
-    function getUrlParams() {
-        const params = new URLSearchParams(window.location.search);
-        
-        // Función para decodificar parámetros
-        function getParam(name) {
-            const value = params.get(name);
-            return value ? decodeURIComponent(value) : '';
-        }
-        
-        // Obtener los datos raw
-        const nombresRaw = getParam('plagas_nombres');
-        const lugaresRaw = getParam('plagas_lugares');
-        const metodosRaw = getParam('plagas_metodos');
-        const preciosRaw = getParam('plagas_precios');
-        
-        // Dividir por punto y coma para obtener grupos
-        const gruposNombres = nombresRaw ? nombresRaw.split(';').filter(g => g.trim()) : [];
-        const gruposLugares = lugaresRaw ? lugaresRaw.split(';') : [];
-        const gruposMetodos = metodosRaw ? metodosRaw.split(';') : [];
-        const gruposPrecios = preciosRaw ? preciosRaw.split(';') : [];
-        
-        // Construir array de plagas (cada grupo es un ítem)
-        const plagas = [];
-        
-        for (let i = 0; i < gruposNombres.length; i++) {
-            plagas.push({
-                nombre: gruposNombres[i].trim(),
-                lugares: (gruposLugares[i] || 'Todas las áreas').trim(),
-                metodos: (gruposMetodos[i] || 'Tratamiento estándar').trim(),
-                precio: parseFloat(gruposPrecios[i]) || 100
-            });
-        }
-        
-        // Si no hay plagas, agregar una por defecto
-        if (plagas.length === 0) {
-            plagas.push({
-                nombre: "Servicio de Control de Plagas",
-                lugares: "Todas las áreas",
-                metodos: "Según evaluación",
-                precio: 200
-            });
-        }
-        
-        return {
-            numero: getParam('numero') || '2024-001',
-            fecha: getParam('fecha') || new Date().toLocaleDateString('es-EC'),
-            clienteNombre: getParam('cliente_nombre') || 'Cliente',
-            clienteRuc: getParam('cliente_ruc') || '',
-            clienteAtencion: getParam('cliente_atencion') || '',
-            clienteDireccion: getParam('cliente_direccion') || 'No especificada',
-            clienteTelefono: getParam('cliente_telefono') || 'No especificado',
-            clienteEmail: getParam('cliente_email') || 'No especificado',
-            proceso: getParam('proceso') || 'Proceso estándar',
-            observaciones: getParam('observaciones') || 'Sin observaciones adicionales',
-            firmaNombre: getParam('firma_nombre') || 'Representante',
-            firmaCargo: 'Ejecutivo Comercial',
-            formaPago: getParam('forma_pago') || 'Contado',
-            plagas: plagas
-        };
+function getUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    
+    // Función para decodificar parámetros
+    function getParam(name) {
+        const value = params.get(name);
+        return value ? decodeURIComponent(value) : '';
     }
     
-    function fillTemplate() {
-        try {
-            const data = getUrlParams();
-            console.log('Datos procesados:', data);
+    // Función para parsear listas de AppSheet
+    function parseAppSheetList(rawString) {
+        if (!rawString) return [];
+        
+        // Remover los corchetes {} si existen
+        let cleaned = rawString.replace(/^\{|\}$/g, '');
+        
+        // Dividir por " , " (espacio+coma) para obtener grupos
+        let groups = cleaned.split(' , ');
+        
+        // Si no hay grupos (no hay " , "), intentar solo con el contenido
+        if (groups.length === 1 && cleaned) {
+            return [cleaned];
+        }
+        
+        return groups.filter(g => g.trim());
+    }
+    
+    // Obtener los datos raw
+    const nombresRaw = getParam('plagas_nombres');
+    const lugaresRaw = getParam('plagas_lugares');
+    const metodosRaw = getParam('plagas_metodos');
+    const preciosRaw = getParam('plagas_precios');
+    
+    // Parsear las listas usando el formato de AppSheet
+    const gruposNombres = parseAppSheetList(nombresRaw);
+    const gruposLugares = parseAppSheetList(lugaresRaw);
+    const gruposMetodos = parseAppSheetList(metodosRaw);
+    const gruposPrecios = parseAppSheetList(preciosRaw);
+    
+    // Construir array de plagas
+    const plagas = [];
+    
+    // Si tenemos grupos de nombres
+    if (gruposNombres.length > 0) {
+        for (let i = 0; i < gruposNombres.length; i++) {
+            // Limpiar el nombre del grupo (puede tener comas internas)
+            let nombreGrupo = gruposNombres[i].trim();
             
-            // Función helper para asignar texto de forma segura
-            const setTextContent = (id, value) => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.textContent = value || '-';
-                }
-            };
-            
-            // Llenar información básica
-            setTextContent('numero', data.numero);
-            setTextContent('fecha', data.fecha);
-            setTextContent('cliente-nombre', data.clienteNombre);
-            setTextContent('cliente-ruc', data.clienteRuc);
-            setTextContent('cliente-atencion', data.clienteAtencion);
-            setTextContent('cliente-direccion', data.clienteDireccion);
-            setTextContent('cliente-telefono', data.clienteTelefono);
-            setTextContent('cliente-email', data.clienteEmail);
-            setTextContent('proceso', data.proceso);
-            setTextContent('observaciones', data.observaciones);
-            setTextContent('firma-nombre', data.firmaNombre);
-            setTextContent('firma-cargo', data.firmaCargo);
-            
-            // Llenar tabla de plagas
-            const tbody = document.getElementById('tabla-plagas');
-            if (tbody) {
-                tbody.innerHTML = '';
-                let subtotal = 0;
-                
-                data.plagas.forEach((plaga, index) => {
-                    const row = tbody.insertRow();
-                    row.innerHTML = `
-                        <td><strong>${plaga.nombre}</strong></td>
-                        <td>${plaga.lugares}</td>
-                        <td>${plaga.metodos}</td>
-                        <td class="text-right" style="font-family: monospace;">$${plaga.precio.toFixed(2)}</td>
-                    `;
-                    subtotal += plaga.precio;
-                });
-                
-                // Calcular y mostrar totales
-                const iva = subtotal * 0.15;
-                const total = subtotal + iva;
-                
-                setTextContent('subtotal', `$${subtotal.toFixed(2)}`);
-                setTextContent('iva', `$${iva.toFixed(2)}`);
-                setTextContent('total', `$${total.toFixed(2)}`);
-                
-                // Agregar forma de pago
-                const totalsDiv = document.querySelector('.totals');
-                if (totalsDiv && data.formaPago) {
-                    const existingFormaPago = document.getElementById('forma-pago-row');
-                    if (!existingFormaPago) {
-                        const formaPagoDiv = document.createElement('div');
-                        formaPagoDiv.id = 'forma-pago-row';
-                        formaPagoDiv.className = 'total-row';
-                        formaPagoDiv.style.marginTop = '15px';
-                        formaPagoDiv.style.paddingTop = '10px';
-                        formaPagoDiv.style.borderTop = '1px solid #ddd';
-                        formaPagoDiv.innerHTML = `
-                            <span><strong>Forma de Pago:</strong></span>
-                            <span>${data.formaPago}</span>
-                        `;
-                        totalsDiv.appendChild(formaPagoDiv);
-                    }
-                }
+            // El precio puede ser un número solo o estar en la misma posición
+            let precio = 100; // precio por defecto
+            if (gruposPrecios[i]) {
+                precio = parseFloat(gruposPrecios[i]) || 100;
+            } else if (gruposPrecios.length === 1) {
+                // Si solo hay un precio, aplicarlo a todos
+                precio = parseFloat(gruposPrecios[0]) || 100;
             }
             
-        } catch (error) {
-            console.error('Error llenando plantilla:', error);
+            plagas.push({
+                nombre: nombreGrupo,
+                lugares: (gruposLugares[i] || gruposLugares[0] || 'Todas las áreas').trim(),
+                metodos: (gruposMetodos[i] || gruposMetodos[0] || 'Tratamiento estándar').trim(),
+                precio: precio
+            });
         }
+    } else {
+        // Fallback si no hay datos
+        plagas.push({
+            nombre: "Servicio de Control de Plagas",
+            lugares: "Todas las áreas",
+            metodos: "Según evaluación",
+            precio: 200
+        });
     }
     
-    // Ejecutar cuando el DOM esté listo
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', fillTemplate);
-    } else {
-        fillTemplate();
+    return {
+        numero: getParam('numero') || '2024-001',
+        fecha: getParam('fecha') || new Date().toLocaleDateString('es-EC'),
+        clienteNombre: getParam('cliente_nombre') || 'Cliente',
+        clienteRuc: getParam('cliente_ruc') || '',
+        clienteAtencion: getParam('cliente_atencion') || '',
+        clienteDireccion: getParam('cliente_direccion') || 'No especificada',
+        clienteTelefono: getParam('cliente_telefono') || 'No especificado',
+        clienteEmail: getParam('cliente_email') || 'No especificado',
+        proceso: getParam('proceso') || 'Proceso estándar',
+        observaciones: getParam('observaciones') || 'Sin observaciones adicionales',
+        firmaNombre: getParam('firma_nombre') || 'Representante',
+        firmaCargo: 'Ejecutivo Comercial',
+        formaPago: getParam('forma_pago') || 'Contado',
+        plagas: plagas
+    };
+}
+
+function fillTemplate() {
+    try {
+        const data = getUrlParams();
+        console.log('Datos procesados:', data);
+        
+        // Función helper para asignar texto de forma segura
+        const setTextContent = (id, value) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value || '-';
+            }
+        };
+        
+        // Llenar información básica
+        setTextContent('numero', data.numero);
+        setTextContent('fecha', data.fecha);
+        setTextContent('cliente-nombre', data.clienteNombre);
+        setTextContent('cliente-ruc', data.clienteRuc);
+        setTextContent('cliente-atencion', data.clienteAtencion);
+        setTextContent('cliente-direccion', data.clienteDireccion);
+        setTextContent('cliente-telefono', data.clienteTelefono);
+        setTextContent('cliente-email', data.clienteEmail);
+        setTextContent('proceso', data.proceso);
+        setTextContent('observaciones', data.observaciones);
+        setTextContent('firma-nombre', data.firmaNombre);
+        setTextContent('firma-cargo', data.firmaCargo);
+        
+        // Llenar tabla de plagas
+        const tbody = document.getElementById('tabla-plagas');
+        if (tbody) {
+            tbody.innerHTML = '';
+            let subtotal = 0;
+            
+            data.plagas.forEach((plaga, index) => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td><strong>${plaga.nombre}</strong></td>
+                    <td>${plaga.lugares}</td>
+                    <td>${plaga.metodos}</td>
+                    <td class="text-right" style="font-family: monospace;">$${plaga.precio.toFixed(2)}</td>
+                `;
+                subtotal += plaga.precio;
+            });
+            
+            // Calcular y mostrar totales
+            const iva = subtotal * 0.15;
+            const total = subtotal + iva;
+            
+            setTextContent('subtotal', `$${subtotal.toFixed(2)}`);
+            setTextContent('iva', `$${iva.toFixed(2)}`);
+            setTextContent('total', `$${total.toFixed(2)}`);
+            
+            // Agregar forma de pago
+            const totalsDiv = document.querySelector('.totals');
+            if (totalsDiv && data.formaPago) {
+                const existingFormaPago = document.getElementById('forma-pago-row');
+                if (!existingFormaPago) {
+                    const formaPagoDiv = document.createElement('div');
+                    formaPagoDiv.id = 'forma-pago-row';
+                    formaPagoDiv.className = 'total-row';
+                    formaPagoDiv.style.marginTop = '15px';
+                    formaPagoDiv.style.paddingTop = '10px';
+                    formaPagoDiv.style.borderTop = '1px solid #ddd';
+                    formaPagoDiv.innerHTML = `
+                        <span><strong>Forma de Pago:</strong></span>
+                        <span>${data.formaPago}</span>
+                    `;
+                    totalsDiv.appendChild(formaPagoDiv);
+                }
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error llenando plantilla:', error);
     }
-    </script>
-</body>
+}
+
+// Ejecutar cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fillTemplate);
+} else {
+    fillTemplate();
+}
+</script>
+    </body>
 </html>
